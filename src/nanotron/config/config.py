@@ -2,7 +2,7 @@ import datetime
 import os
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import dacite
 import torch
@@ -360,7 +360,6 @@ class Config:
         return cls(**{f.name: None for f in cls_fields})
 
     def __post_init__(self):
-
         if self.s3_upload is not None:
             self.s3_upload.__post_init__()
 
@@ -458,9 +457,36 @@ def get_config_from_dict(
     )
 
 
+@dataclass
+class ConfigOverride:
+    keys: List[str]
+    value: Any
+
+
+def deep_update(d: Dict[str, Any], keys: List[str], value: Any):
+    """Recursively updates a dictionary given a list of keys."""
+    assert keys
+    if keys[0] not in d:
+        return False
+    if len(keys) == 1:
+        # get original type of value and cast to it
+        value_type = type(d[keys[0]])
+        d[keys[0]] = value_type(value)
+        return True
+    return deep_update(d[keys[0]], keys[1:], value)
+
+
+def override_config(config_dict: Dict[str, Any], overrides: List[ConfigOverride]):
+    """Overrides a config object with a list of ConfigOverride objects"""
+    for override in overrides:
+        if not deep_update(config_dict, override.keys, override.value):
+            raise ValueError(f"Failed to override config {override.keys} to {override.value}")
+
+
 def get_config_from_file(
     config_path: str,
     config_class: Type = Config,
+    config_overrides: List[ConfigOverride] = [],
     model_config_class: Optional[Type] = None,
     skip_unused_config_keys: bool = False,
     skip_null_keys: bool = False,
@@ -478,6 +504,9 @@ def get_config_from_file(
     # Open the file and load the file
     with open(config_path) as f:
         config_dict = yaml.load(f, Loader=SafeLoader)
+
+    # Override the config with the command line arguments
+    override_config(config_dict, config_overrides)
 
     config = get_config_from_dict(
         config_dict,

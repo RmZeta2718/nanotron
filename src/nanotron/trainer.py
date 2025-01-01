@@ -28,6 +28,7 @@ from nanotron import distributed as dist
 from nanotron import logging
 from nanotron.config import (
     Config,
+    ConfigOverride,
     DatasetStageArgs,
     ExistingCheckpointInit,
     ParallelismArgs,
@@ -118,6 +119,7 @@ class DistributedTrainer:
         self,
         config_or_config_file: Union[Config, str],
         config_class: Type[Config] = Config,
+        config_overrides: List[ConfigOverride] = [],
         model_config_class: Optional[Type] = None,
         model_class: Type[NanotronModel] = None,
     ):
@@ -133,7 +135,10 @@ class DistributedTrainer:
 
         super().__init__()
         self.config = get_config_from_file(
-            config_or_config_file, config_class=config_class, model_config_class=model_config_class
+            config_or_config_file,
+            config_class=config_class,
+            config_overrides=config_overrides,
+            model_config_class=model_config_class,
         )
         self.model_config = self.config.model.model_config
         if model_class is not None:
